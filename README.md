@@ -36,38 +36,9 @@ After an assistant response contains code blocks, use commands, shortcuts, or th
 
 ### Commands
 
-```text
-/cc
-/cc 2
-/cc help
-/copy-code
-/vc
-/vc 2
-/view-code
-/cc-help
-/codeblock-copy-help
-```
-
-| Command | Description |
-| --- | --- |
-| `/cc` or `/copy-code` | Pick and copy a code block from the latest assistant response |
-| `/cc 2` | Copy block 2 directly |
-| `/cc help`, `/cc --help`, `/cc -h`, `/cc ?` | Open command and shortcut help |
-| `/vc` or `/view-code` | Pick and open a code block in Pi's editor |
-| `/vc 2` | Open block 2 directly |
-| `/vc help`, `/vc --help`, `/vc -h`, `/vc ?` | Open command and shortcut help |
-| `/cc-help` or `/codeblock-copy-help` | Open command and shortcut help |
-
-### Shortcuts
-
-| Shortcut | Description |
-| --- | --- |
-| `ctrl+shift+y` | Copy a block from the latest assistant response |
-| `ctrl+shift+x` | Start prefix mode |
-| `ctrl+shift+x`, then `c` | Pick and copy a block |
-| `ctrl+shift+x`, then `v` | Pick and view a block |
-| `ctrl+shift+x`, then `1`-`9` | Copy that numbered block |
-| `esc` or `ctrl+c` | Cancel prefix mode |
+- Copy: `/cc`, `/copy-code`, `/cc 2`
+- View: `/vc`, `/view-code`, `/vc 2`
+- Help: `/cc help`, `/vc help`, `/cc-help`, `/codeblock-copy-help`
 
 ## Configuration
 
