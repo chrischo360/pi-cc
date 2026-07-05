@@ -4,7 +4,7 @@
 
 # Demo
 
-https://github.com/user-attachments/assets/3390435a-ace2-4717-b71a-95f663258e58
+https://github.com/user-attachments/assets/1fbab0d8-a050-490b-b3f0-3726c4eaa13b
 
 ## What it does
 
