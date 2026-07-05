@@ -1,156 +1,26 @@
 import { copyToClipboard } from "@earendil-works/pi-coding-agent";
 import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import {
-	DEFAULT_COMMANDS,
-	DEFAULT_DIRECT_SHORTCUT,
-	DEFAULT_HELP_COMMANDS,
-	DEFAULT_LEADER_SHORTCUT,
-	DEFAULT_LEADER_TIMEOUT_MS,
-	DEFAULT_VIEW_COMMANDS,
+	COMMANDS,
+	DIRECT_SHORTCUT,
+	EXCLUDE_LANGUAGES as CONFIG_EXCLUDE_LANGUAGES,
+	HELP_COMMANDS,
+	LEADER_SHORTCUT,
+	LEADER_TIMEOUT_MS,
 	SUPPORTED_LANGUAGES,
+	VIEW_COMMANDS,
 	WIDGET_KEY,
 } from "./Config.ts";
-import type { CodeBlock, CodeblockCopyConfig, ParsedLanguage } from "./Types.ts";
+import type { CodeBlock, ParsedLanguage } from "./Types.ts";
 
 const SUPPORTED_LANGUAGE_BY_ALIAS = new Map(
 	SUPPORTED_LANGUAGES.flatMap((language) => language.aliases.map((alias) => [alias, language] as const)),
 );
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-	return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function configPath(): string {
-	return join(dirname(fileURLToPath(import.meta.url)), "config.json");
-}
-
-function readFileConfig(): Record<string, unknown> {
-	const path = configPath();
-	if (!existsSync(path)) return {};
-
-	try {
-		const config = JSON.parse(readFileSync(path, "utf8"));
-		return isRecord(config) ? config : {};
-	} catch {
-		return {};
-	}
-}
-
-function parseCommands(value: unknown): string[] | undefined {
-	const raw = typeof value === "string" ? value.split(",") : Array.isArray(value) ? value : undefined;
-	if (!raw) return undefined;
-
-	const commands = raw
-		.filter((item): item is string => typeof item === "string")
-		.map((item) => item.trim().replace(/^\/+/, ""))
-		.filter(Boolean);
-
-	return commands.length > 0 ? [...new Set(commands)] : undefined;
-}
-
-function parseLanguageFilter(value: unknown): Set<string> | undefined {
-	const raw = typeof value === "string" ? value.split(",") : Array.isArray(value) ? value : undefined;
-	if (!raw) return undefined;
-
-	const languages = raw
-		.filter((item): item is string => typeof item === "string")
-		.map((item) => item.trim())
-		.filter(Boolean)
-		.map((item) => parseLanguage(item).name);
-
-	return languages.length > 0 ? new Set(languages) : undefined;
-}
-
-function parseShortcut(value: unknown): string | false | undefined {
-	if (value === false || value === null) return false;
-	if (typeof value !== "string") return undefined;
-
-	const shortcut = value.trim();
-	if (!shortcut || ["false", "none", "off"].includes(shortcut.toLowerCase())) return false;
-	return shortcut;
-}
-
-function resolveShortcut(fallback: string, ...values: unknown[]): string | undefined {
-	for (const value of values) {
-		const shortcut = parseShortcut(value);
-		if (shortcut !== undefined) return shortcut || undefined;
-	}
-	return fallback;
-}
-
-function parsePositiveInteger(value: unknown): number | undefined {
-	const number = typeof value === "number" ? value : typeof value === "string" ? Number.parseInt(value, 10) : NaN;
-	return Number.isInteger(number) && number > 0 ? number : undefined;
-}
-
-function loadConfig(): CodeblockCopyConfig {
-	const fileConfig = readFileConfig();
-	return {
-		commands:
-			parseCommands(process.env.PI_CODEBLOCK_COPY_COMMANDS) ??
-			parseCommands(process.env.PI_CODEBLOCK_COPY_COMMAND) ??
-			parseCommands(fileConfig.commands) ??
-			parseCommands(fileConfig.command) ??
-			DEFAULT_COMMANDS,
-		viewCommands:
-			parseCommands(process.env.PI_CODEBLOCK_COPY_VIEW_COMMANDS) ??
-			parseCommands(process.env.PI_CODEBLOCK_COPY_VIEW_COMMAND) ??
-			parseCommands(fileConfig.viewCommands) ??
-			parseCommands(fileConfig.viewCommand) ??
-			DEFAULT_VIEW_COMMANDS,
-		helpCommands:
-			parseCommands(process.env.PI_CODEBLOCK_COPY_HELP_COMMANDS) ??
-			parseCommands(process.env.PI_CODEBLOCK_COPY_HELP_COMMAND) ??
-			parseCommands(fileConfig.helpCommands) ??
-			parseCommands(fileConfig.helpCommand) ??
-			DEFAULT_HELP_COMMANDS,
-		includeLanguages:
-			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_INCLUDE_LANGUAGES) ??
-			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_INCLUDE_LANGUAGE) ??
-			parseLanguageFilter(fileConfig.includeLanguages) ??
-			parseLanguageFilter(fileConfig.includeLanguage),
-		excludeLanguages:
-			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_EXCLUDE_LANGUAGES) ??
-			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_EXCLUDE_LANGUAGE) ??
-			parseLanguageFilter(fileConfig.excludeLanguages) ??
-			parseLanguageFilter(fileConfig.excludeLanguage) ??
-			new Set<string>(),
-		leaderShortcut: resolveShortcut(
-			DEFAULT_LEADER_SHORTCUT,
-			process.env.PI_CODEBLOCK_COPY_LEADER_SHORTCUT,
-			process.env.PI_CODEBLOCK_COPY_LEADER,
-			fileConfig.leaderShortcut,
-			fileConfig.leader,
-		),
-		directShortcut: resolveShortcut(
-			DEFAULT_DIRECT_SHORTCUT,
-			process.env.PI_CODEBLOCK_COPY_DIRECT_SHORTCUT,
-			process.env.PI_CODEBLOCK_COPY_SHORTCUT,
-			fileConfig.directShortcut,
-			fileConfig.shortcut,
-		),
-		leaderTimeoutMs:
-			parsePositiveInteger(process.env.PI_CODEBLOCK_COPY_LEADER_TIMEOUT_MS) ??
-			parsePositiveInteger(fileConfig.leaderTimeoutMs) ??
-			DEFAULT_LEADER_TIMEOUT_MS,
-	};
-}
-
-const CONFIG = loadConfig();
-const COMMANDS = CONFIG.commands;
-const VIEW_COMMANDS = CONFIG.viewCommands;
-const HELP_COMMANDS = CONFIG.helpCommands;
-const PRIMARY_COMMAND = COMMANDS.includes("cc") ? "cc" : COMMANDS[0] || DEFAULT_COMMANDS[0];
-const PRIMARY_VIEW_COMMAND = VIEW_COMMANDS.includes("vc") ? "vc" : VIEW_COMMANDS[0] || DEFAULT_VIEW_COMMANDS[0];
-const PRIMARY_HELP_COMMAND = HELP_COMMANDS.includes("cc-help") ? "cc-help" : HELP_COMMANDS[0] || DEFAULT_HELP_COMMANDS[0];
-const INCLUDE_LANGUAGES = CONFIG.includeLanguages;
-const EXCLUDE_LANGUAGES = CONFIG.excludeLanguages;
-const LEADER = CONFIG.leaderShortcut;
-const DIRECT_SHORTCUT = CONFIG.directShortcut;
-const LEADER_TIMEOUT_MS = CONFIG.leaderTimeoutMs;
+const PRIMARY_COMMAND = COMMANDS[0];
+const PRIMARY_VIEW_COMMAND = VIEW_COMMANDS[0];
+const PRIMARY_HELP_COMMAND = HELP_COMMANDS[0];
+const EXCLUDE_LANGUAGE_NAMES = new Set(CONFIG_EXCLUDE_LANGUAGES.map((language) => parseLanguage(language).name));
 const COPY_STATUS_FLASH_MS = 750;
 let copyStatusFlashTimer: ReturnType<typeof setTimeout> | undefined;
 
@@ -221,7 +91,7 @@ function getPreview(code: string): string {
 }
 
 function shouldIncludeLanguage(language: ParsedLanguage): boolean {
-	return (!INCLUDE_LANGUAGES || INCLUDE_LANGUAGES.has(language.name)) && !EXCLUDE_LANGUAGES.has(language.name);
+	return !EXCLUDE_LANGUAGE_NAMES.has(language.name);
 }
 
 function extractCodeBlocks(markdown: string): CodeBlock[] {
@@ -297,7 +167,7 @@ function widgetBlock(ctx: ExtensionContext, block: CodeBlock): string {
 }
 
 function widgetLines(ctx: ExtensionContext, blocks: CodeBlock[]): string[] {
-	const hints = [LEADER ? `${LEADER}: c [$]` : undefined].filter((hint): hint is string => Boolean(hint));
+	const hints = [LEADER_SHORTCUT ? `${LEADER_SHORTCUT}: c [$]` : undefined].filter((hint): hint is string => Boolean(hint));
 	const hint = hints.length > 0 ? `  ${ctx.ui.theme.fg("dim", hints.join(" · "))}` : "";
 	return [`/${PRIMARY_COMMAND} [n]${hint}`, ...blocks.map((block) => widgetBlock(ctx, block))];
 }
@@ -429,9 +299,9 @@ async function showHelp(ctx: ExtensionContext): Promise<void> {
 		`/${PRIMARY_COMMAND} [n] — copy block n, or pick if omitted`,
 		`/${PRIMARY_VIEW_COMMAND} [n] — view block n, or pick if omitted`,
 		`/${PRIMARY_HELP_COMMAND} — show this help`,
-		LEADER ? `${LEADER} then c — pick a block to copy` : undefined,
-		LEADER ? `${LEADER} then v — pick a block to view` : undefined,
-		LEADER ? `${LEADER} then 1-9 — copy that block` : undefined,
+		LEADER_SHORTCUT ? `${LEADER_SHORTCUT} then c — pick a block to copy` : undefined,
+		LEADER_SHORTCUT ? `${LEADER_SHORTCUT} then v — pick a block to view` : undefined,
+		LEADER_SHORTCUT ? `${LEADER_SHORTCUT} then 1-9 — copy that block` : undefined,
 		DIRECT_SHORTCUT ? `${DIRECT_SHORTCUT} — copy or pick` : undefined,
 	].filter((line): line is string => Boolean(line));
 
@@ -528,8 +398,8 @@ export default function (pi: ExtensionAPI) {
 		pi.registerCommand(name, helpCommand);
 	}
 
-	if (LEADER) {
-		pi.registerShortcut(LEADER, {
+	if (LEADER_SHORTCUT) {
+		pi.registerShortcut(LEADER_SHORTCUT, {
 			description: "Pi prefix for code block copy",
 			handler: (ctx) => {
 				startLeader(ctx);

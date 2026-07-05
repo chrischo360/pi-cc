@@ -22,13 +22,3 @@ export interface CodeBlock {
 	preview: string;
 }
 
-export interface CodeblockCopyConfig {
-	commands: string[];
-	viewCommands: string[];
-	helpCommands: string[];
-	includeLanguages?: Set<string>;
-	excludeLanguages: Set<string>;
-	leaderShortcut?: string;
-	directShortcut?: string;
-	leaderTimeoutMs: number;
-}

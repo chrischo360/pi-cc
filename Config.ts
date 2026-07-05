@@ -2,13 +2,15 @@ import type { SupportedLanguage } from "./Types.ts";
 
 export const WIDGET_KEY = "codeblock-copy";
 
-export const DEFAULT_COMMANDS = ["copy-code", "cc"];
-export const DEFAULT_VIEW_COMMANDS = ["view-code", "vc"];
-export const DEFAULT_HELP_COMMANDS = ["codeblock-copy-help", "cc-help"];
+export const COMMANDS = ["cc", "copy-code"];
+export const VIEW_COMMANDS = ["vc", "view-code"];
+export const HELP_COMMANDS = ["cc-help", "codeblock-copy-help"];
 
-export const DEFAULT_LEADER_SHORTCUT = "ctrl+shift+x";
-export const DEFAULT_DIRECT_SHORTCUT = "ctrl+shift+y";
-export const DEFAULT_LEADER_TIMEOUT_MS = 2000;
+export const LEADER_SHORTCUT = "ctrl+shift+x";
+export const DIRECT_SHORTCUT = "ctrl+shift+y";
+export const LEADER_TIMEOUT_MS = 2000;
+
+export const EXCLUDE_LANGUAGES: string[] = [];
 
 export const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
 	{ name: "bash", extension: "sh", aliases: ["bash", "sh", "shell"], color: "success" },
