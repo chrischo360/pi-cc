@@ -36,9 +36,30 @@ After an assistant response contains code blocks, use commands, shortcuts, or th
 
 ### Commands
 
-- Copy: `/cc`, `/copy-code`, `/cc 2`
-- View: `/vc`, `/view-code`, `/vc 2`
-- Help: `/cc help`, `/vc help`, `/cc-help`, `/codeblock-copy-help`
+#### Copy
+
+```
+/cc
+/copy-code
+/cc 2
+```
+
+#### View
+
+```
+/vc
+/view-code
+/vc 2
+```
+
+#### Help
+
+```
+/cc help
+/vc help
+/cc-help
+/codeblock-copy-help
+```
 
 ## Configuration
 
@@ -58,24 +79,9 @@ export const DEFAULT_LEADER_TIMEOUT_MS = 2000;
 
 The extension recognizes fenced code blocks using backticks or tildes.
 
-Supported languages include:
+Built-in language aliases are defined in `index.ts` under `SUPPORTED_LANGUAGES`.
 
-- `bash`, `sh`, `shell`
-- `css`
-- `diff`, `patch`
-- `html`
-- `javascript`, `js`
-- `json`
-- `jsx`
-- `lua`
-- `python`, `py`
-- `sql`
-- `text`, `txt`, `plain`, `plaintext`
-- `typescript`, `ts`
-- `tsx`
-- `toml`
-- `yaml`, `yml`
-- `zsh`
+Add support for your own language by adding a new entry with a name, file extension, aliases, and display color.
 
 Unknown languages are still copyable and are shown with their fence label.
 
