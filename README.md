@@ -32,7 +32,7 @@ The package advertises its extension through `package.json`:
 
 ## Usage
 
-After an assistant response contains code blocks, use commands, shortcuts, or the copy panel above the editor.
+After an assistant response contains code blocks, use commands or the copy panel above the editor.
 
 ### Commands
 
@@ -63,36 +63,54 @@ After an assistant response contains code blocks, use commands, shortcuts, or th
 
 ## Configuration
 
-Default commands, shortcuts, and supported languages live in `Config.ts`. Edit the constants, then restart Pi.
+Default commands live in `Config.ts`. Language aliases live in `languages.ts`. Edit the constants, then restart Pi.
 
 ```ts
-export const COMMANDS = ["cc", "copy-code"];
-export const VIEW_COMMANDS = ["vc", "view-code"];
-export const HELP_COMMANDS = ["cc-help", "codeblock-copy-help"];
+import type { Language } from "./types.ts";
 
-export const LEADER_SHORTCUT = "ctrl+shift+x";
-export const DIRECT_SHORTCUT = "ctrl+shift+y";
-export const LEADER_TIMEOUT_MS = 2000;
+export const COMMANDS = ["cc", "copy-code"] as const;
+export const VIEW_COMMANDS = ["vc", "view-code"] as const;
+export const HELP_COMMANDS = ["cc-help", "codeblock-copy-help"] as const;
 
-export const EXCLUDE_LANGUAGES = [];
+export const PRIMARY_COMMAND = COMMANDS[0];
+export const PRIMARY_VIEW_COMMAND = VIEW_COMMANDS[0];
+export const PRIMARY_HELP_COMMAND = HELP_COMMANDS[0];
 
-export const SUPPORTED_LANGUAGES = [
-  { name: "bash", extension: "sh", aliases: ["bash", "sh", "shell"], color: "success" },
-];
+export const EXCLUDE_LANGUAGES: readonly Language[] = [];
+```
+
+To exclude a language, use one from `languages.ts`:
+
+```ts
+import { LANGUAGES } from "./languages.ts";
+import type { Language } from "./types.ts";
+
+export const EXCLUDE_LANGUAGES: readonly Language[] = [LANGUAGES.markdown];
 ```
 
 ## Supported code fences
 
 The extension recognizes fenced code blocks using backticks or tildes.
 
-Built-in language aliases are defined in `Config.ts` under `SUPPORTED_LANGUAGES`.
+Built-in language aliases are defined in `languages.ts` under `LANGUAGES`.
 
-Add support for your own language by adding a new entry with a name, file extension, aliases, and display color. Shared types live in `Types.ts`.
+Add support for your own language by adding a new `Language` entry, then restart Pi. Shared types live in `types.ts`.
 
 Unknown languages are still copyable and are shown with their fence label.
+
+File layout:
+
+- `Config.ts` — commands and excluded languages
+- `languages.ts` — supported language definitions
+- `types.ts` — shared types
+- `language.ts` — language normalization
+- `code-blocks.ts` — fenced code block extraction
+- `messages.ts` — latest assistant message text
+- `ui.ts` — copy panel, labels, help, notifications
 
 ## Development
 
 ```bash
 yarn install
+yarn typecheck
 ```

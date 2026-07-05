@@ -1,16 +1,13 @@
 import type { ThemeColor } from "@earendil-works/pi-coding-agent";
 
-export interface SupportedLanguage {
-	name: string;
-	extension: string;
-	aliases: string[];
-	color: ThemeColor;
+export interface Language {
+	readonly name: string;
+	readonly extension: string;
+	readonly aliases: readonly string[];
+	readonly color: ThemeColor;
 }
 
-export interface ParsedLanguage {
-	name: string;
-	extension: string;
-	color: ThemeColor;
+export interface ParsedLanguage extends Pick<Language, "name" | "extension" | "color"> {
 	supported: boolean;
 }
 
@@ -21,4 +18,3 @@ export interface CodeBlock {
 	lineCount: number;
 	preview: string;
 }
-
