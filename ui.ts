@@ -35,12 +35,16 @@ function widgetLines(ctx: ExtensionContext, blocks: CodeBlock[]): string[] {
 	return [`/${PRIMARY_COMMAND} [n]`, ...blocks.map((block) => widgetBlock(ctx, block))];
 }
 
+export function clearWidget(ctx: ExtensionContext): void {
+	ctx.ui.setWidget(WIDGET_KEY, undefined);
+}
+
 export function updateWidget(ctx: ExtensionContext, text: string | null): void {
 	if (!ctx.hasUI) return;
 
 	const blocks = text ? extractCodeBlocks(text) : [];
 	if (blocks.length === 0) {
-		ctx.ui.setWidget(WIDGET_KEY, undefined);
+		clearWidget(ctx);
 		return;
 	}
 
