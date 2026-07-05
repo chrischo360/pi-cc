@@ -14,7 +14,7 @@ Use it to:
 
 - Copy a specific code block to your clipboard
 - Pick from multiple code blocks with a selector
-- Open a code block in Pi's editor before copying or editing it
+- Open a code block in Pi's editor for viewing or editing
 
 ## Installation
 
@@ -32,24 +32,30 @@ The package advertises its extension through `package.json`:
 
 ## Usage
 
-After an assistant response contains code blocks, use either commands or shortcuts.
+After an assistant response contains code blocks, use commands, shortcuts, or the copy panel above the editor.
 
 ### Commands
 
 ```text
 /cc
 /cc 2
+/cc help
+/copy-code
 /vc
 /vc 2
+/view-code
 /cc-help
+/codeblock-copy-help
 ```
 
 | Command | Description |
 | --- | --- |
-| `/cc` or `/copy-code` | Copy a code block from the latest assistant response |
+| `/cc` or `/copy-code` | Pick and copy a code block from the latest assistant response |
 | `/cc 2` | Copy block 2 directly |
-| `/vc` or `/view-code` | Open a code block in the Pi editor |
+| `/cc help`, `/cc --help`, `/cc -h`, `/cc ?` | Open command and shortcut help |
+| `/vc` or `/view-code` | Pick and open a code block in Pi's editor |
 | `/vc 2` | Open block 2 directly |
+| `/vc help`, `/vc --help`, `/vc -h`, `/vc ?` | Open command and shortcut help |
 | `/cc-help` or `/codeblock-copy-help` | Open command and shortcut help |
 
 ### Shortcuts
@@ -61,39 +67,21 @@ After an assistant response contains code blocks, use either commands or shortcu
 | `ctrl+shift+x`, then `c` | Pick and copy a block |
 | `ctrl+shift+x`, then `v` | Pick and view a block |
 | `ctrl+shift+x`, then `1`-`9` | Copy that numbered block |
-| `esc` | Cancel prefix mode |
+| `esc` or `ctrl+c` | Cancel prefix mode |
 
 ## Configuration
 
-Configure with environment variables or a local `config.json` next to `index.ts`. Environment variables take precedence.
+Default commands and shortcuts live in `Config.ts`. Edit the constants, then restart Pi.
 
-### Environment variables
+```ts
+export const DEFAULT_COMMANDS = ["copy-code", "cc"];
+export const DEFAULT_VIEW_COMMANDS = ["view-code", "vc"];
+export const DEFAULT_HELP_COMMANDS = ["codeblock-copy-help", "cc-help"];
 
-```bash
-PI_CODEBLOCK_COPY_COMMANDS="copy-code,cc"
-PI_CODEBLOCK_COPY_VIEW_COMMANDS="view-code,vc"
-PI_CODEBLOCK_COPY_HELP_COMMANDS="codeblock-copy-help,cc-help"
-PI_CODEBLOCK_COPY_LEADER_SHORTCUT="ctrl+shift+x"
-PI_CODEBLOCK_COPY_DIRECT_SHORTCUT="ctrl+shift+y"
-PI_CODEBLOCK_COPY_LEADER_TIMEOUT_MS="2000"
+export const DEFAULT_LEADER_SHORTCUT = "ctrl+shift+x";
+export const DEFAULT_DIRECT_SHORTCUT = "ctrl+shift+y";
+export const DEFAULT_LEADER_TIMEOUT_MS = 2000;
 ```
-
-Set a shortcut to `false`, `none`, or `off` to disable it.
-
-### config.json
-
-```json
-{
-  "commands": ["copy-code", "cc"],
-  "viewCommands": ["view-code", "vc"],
-  "helpCommands": ["codeblock-copy-help", "cc-help"],
-  "leaderShortcut": "ctrl+shift+x",
-  "directShortcut": "ctrl+shift+y",
-  "leaderTimeoutMs": 2000
-}
-```
-
-`config.json` is ignored by git so local shortcut preferences stay private.
 
 ## Supported code fences
 
@@ -117,6 +105,8 @@ Supported languages include:
 - `toml`
 - `yaml`, `yml`
 - `zsh`
+
+Unknown languages are still copyable and are shown with their fence label.
 
 ## Development
 
