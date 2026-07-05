@@ -1,4 +1,4 @@
-# pi-codeblock-copy
+# pi-cc
 
 `pi-cc` is an extension for quickly copying Pi (https://pi.dev/) outputs without fighting tmux copy-mode, broken line breaks, terminal wrapping, or accidental prompt text.
 
