@@ -1,17 +1,20 @@
 # pi-codeblock-copy
 
-Copy or inspect code blocks from the latest Pi assistant response without manually selecting terminal text.
+`pi-cc` is an extension for quickly copying Pi (https://pi.dev/) outputs without fighting tmux copy-mode, broken line breaks, terminal wrapping, or accidental prompt text.
+
+# Demo
+
+https://github.com/user-attachments/assets/3390435a-ace2-4717-b71a-95f663258e58
 
 ## What it does
 
-`pi-codeblock-copy` adds a small Pi widget above the editor whenever the latest assistant message contains copyable code blocks. Each block is numbered with its language and preview.
+`pi-cc` detects code blocks in the latest Pi response and displays a compact copy panel with numbered entries, language labels, and previews for quick selection.
 
 Use it to:
 
 - Copy a specific code block to your clipboard
 - Pick from multiple code blocks with a selector
 - Open a code block in Pi's editor before copying or editing it
-- Skip Markdown/documentation fences so README drafts do not crowd the picker
 
 ## Installation
 
@@ -115,12 +118,8 @@ Supported languages include:
 - `yaml`, `yml`
 - `zsh`
 
-Markdown-style fences (`md`, `markdown`, `mdoc`, `mdx`) are intentionally skipped.
-
 ## Development
 
 ```bash
-npm install
+yarn install
 ```
-
-There is no build step in this repo; Pi loads `index.ts` directly as the extension entrypoint.
