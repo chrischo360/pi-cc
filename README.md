@@ -39,26 +39,26 @@ After an assistant response contains code blocks, use commands, shortcuts, or th
 #### Copy
 
 ```
-/cc
-/copy-code
-/cc 2
+/cc         # pick and copy a code block
+/copy-code  # same as /cc
+/cc 2       # copy block 2 directly
 ```
 
 #### View
 
 ```
-/vc
-/view-code
-/vc 2
+/vc         # pick and open a code block in the editor
+/view-code  # same as /vc
+/vc 2       # open block 2 directly
 ```
 
 #### Help
 
 ```
-/cc help
-/vc help
-/cc-help
-/codeblock-copy-help
+/cc help              # show help
+/vc help              # show help
+/cc-help              # show help
+/codeblock-copy-help  # same as /cc-help
 ```
 
 ## Configuration
