@@ -1,5 +1,5 @@
 import { copyToClipboard } from "@earendil-works/pi-coding-agent";
-import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, ThemeColor } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,64 +10,14 @@ import {
 	DEFAULT_LEADER_SHORTCUT,
 	DEFAULT_LEADER_TIMEOUT_MS,
 	DEFAULT_VIEW_COMMANDS,
+	SUPPORTED_LANGUAGES,
 	WIDGET_KEY,
 } from "./Config.ts";
-
-interface SupportedLanguage {
-	name: string;
-	extension: string;
-	aliases: string[];
-	color: ThemeColor;
-}
-
-interface ParsedLanguage {
-	name: string;
-	extension: string;
-	color: ThemeColor;
-	supported: boolean;
-}
-
-const SUPPORTED_LANGUAGES: SupportedLanguage[] = [
-	{ name: "bash", extension: "sh", aliases: ["bash", "sh", "shell"], color: "success" },
-	{ name: "css", extension: "css", aliases: ["css"], color: "accent" },
-	{ name: "diff", extension: "diff", aliases: ["diff", "patch"], color: "warning" },
-	{ name: "html", extension: "html", aliases: ["html"], color: "warning" },
-	{ name: "javascript", extension: "js", aliases: ["javascript", "js"], color: "warning" },
-	{ name: "json", extension: "json", aliases: ["json"], color: "accent" },
-	{ name: "jsx", extension: "jsx", aliases: ["jsx", "javascriptreact"], color: "warning" },
-	{ name: "lua", extension: "lua", aliases: ["lua"], color: "accent" },
-	{ name: "python", extension: "py", aliases: ["python", "py"], color: "error" },
-	{ name: "sql", extension: "sql", aliases: ["sql"], color: "accent" },
-	{ name: "text", extension: "txt", aliases: ["text", "txt", "plain", "plaintext"], color: "dim" },
-	{ name: "typescript", extension: "ts", aliases: ["typescript", "ts"], color: "accent" },
-	{ name: "tsx", extension: "tsx", aliases: ["tsx", "typescriptreact"], color: "accent" },
-	{ name: "toml", extension: "toml", aliases: ["toml"], color: "accent" },
-	{ name: "yaml", extension: "yaml", aliases: ["yaml", "yml"], color: "accent" },
-	{ name: "zsh", extension: "zsh", aliases: ["zsh"], color: "success" },
-];
+import type { CodeBlock, CodeblockCopyConfig, ParsedLanguage } from "./Types.ts";
 
 const SUPPORTED_LANGUAGE_BY_ALIAS = new Map(
 	SUPPORTED_LANGUAGES.flatMap((language) => language.aliases.map((alias) => [alias, language] as const)),
 );
-
-interface CodeBlock {
-	index: number;
-	language: string;
-	code: string;
-	lineCount: number;
-	preview: string;
-}
-
-interface CodeblockCopyConfig {
-	commands: string[];
-	viewCommands: string[];
-	helpCommands: string[];
-	includeLanguages?: Set<string>;
-	excludeLanguages: Set<string>;
-	leaderShortcut?: string;
-	directShortcut?: string;
-	leaderTimeoutMs: number;
-}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === "object" && value !== null && !Array.isArray(value);

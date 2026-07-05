@@ -63,7 +63,7 @@ After an assistant response contains code blocks, use commands, shortcuts, or th
 
 ## Configuration
 
-Default commands and shortcuts live in `Config.ts`. Edit the constants, then restart Pi.
+Default commands, shortcuts, and supported languages live in `Config.ts`. Edit the constants, then restart Pi.
 
 ```ts
 export const DEFAULT_COMMANDS = ["copy-code", "cc"];
@@ -73,15 +73,19 @@ export const DEFAULT_HELP_COMMANDS = ["codeblock-copy-help", "cc-help"];
 export const DEFAULT_LEADER_SHORTCUT = "ctrl+shift+x";
 export const DEFAULT_DIRECT_SHORTCUT = "ctrl+shift+y";
 export const DEFAULT_LEADER_TIMEOUT_MS = 2000;
+
+export const SUPPORTED_LANGUAGES = [
+  { name: "bash", extension: "sh", aliases: ["bash", "sh", "shell"], color: "success" },
+];
 ```
 
 ## Supported code fences
 
 The extension recognizes fenced code blocks using backticks or tildes.
 
-Built-in language aliases are defined in `index.ts` under `SUPPORTED_LANGUAGES`.
+Built-in language aliases are defined in `Config.ts` under `SUPPORTED_LANGUAGES`.
 
-Add support for your own language by adding a new entry with a name, file extension, aliases, and display color.
+Add support for your own language by adding a new entry with a name, file extension, aliases, and display color. Shared types live in `Types.ts`.
 
 Unknown languages are still copyable and are shown with their fence label.
 
