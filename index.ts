@@ -3,14 +3,15 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext, ThemeColo
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-
-const WIDGET_KEY = "codeblock-copy";
-const DEFAULT_COMMANDS = ["copy-code", "cc"];
-const DEFAULT_VIEW_COMMANDS = ["view-code", "vc"];
-const DEFAULT_LEADER_SHORTCUT = "ctrl+x";
-const DEFAULT_DIRECT_SHORTCUT = "ctrl+shift+y";
-const DEFAULT_LEADER_TIMEOUT_MS = 2000;
-const SKIPPED_LANGUAGES = new Set(["md", "markdown", "mdoc", "mdx"]);
+import {
+	DEFAULT_COMMANDS,
+	DEFAULT_DIRECT_SHORTCUT,
+	DEFAULT_HELP_COMMANDS,
+	DEFAULT_LEADER_SHORTCUT,
+	DEFAULT_LEADER_TIMEOUT_MS,
+	DEFAULT_VIEW_COMMANDS,
+	WIDGET_KEY,
+} from "./Config.ts";
 
 interface SupportedLanguage {
 	name: string;
@@ -60,6 +61,9 @@ interface CodeBlock {
 interface CodeblockCopyConfig {
 	commands: string[];
 	viewCommands: string[];
+	helpCommands: string[];
+	includeLanguages?: Set<string>;
+	excludeLanguages: Set<string>;
 	leaderShortcut?: string;
 	directShortcut?: string;
 	leaderTimeoutMs: number;
@@ -95,6 +99,19 @@ function parseCommands(value: unknown): string[] | undefined {
 		.filter(Boolean);
 
 	return commands.length > 0 ? [...new Set(commands)] : undefined;
+}
+
+function parseLanguageFilter(value: unknown): Set<string> | undefined {
+	const raw = typeof value === "string" ? value.split(",") : Array.isArray(value) ? value : undefined;
+	if (!raw) return undefined;
+
+	const languages = raw
+		.filter((item): item is string => typeof item === "string")
+		.map((item) => item.trim())
+		.filter(Boolean)
+		.map((item) => parseLanguage(item).name);
+
+	return languages.length > 0 ? new Set(languages) : undefined;
 }
 
 function parseShortcut(value: unknown): string | false | undefined {
@@ -134,6 +151,23 @@ function loadConfig(): CodeblockCopyConfig {
 			parseCommands(fileConfig.viewCommands) ??
 			parseCommands(fileConfig.viewCommand) ??
 			DEFAULT_VIEW_COMMANDS,
+		helpCommands:
+			parseCommands(process.env.PI_CODEBLOCK_COPY_HELP_COMMANDS) ??
+			parseCommands(process.env.PI_CODEBLOCK_COPY_HELP_COMMAND) ??
+			parseCommands(fileConfig.helpCommands) ??
+			parseCommands(fileConfig.helpCommand) ??
+			DEFAULT_HELP_COMMANDS,
+		includeLanguages:
+			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_INCLUDE_LANGUAGES) ??
+			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_INCLUDE_LANGUAGE) ??
+			parseLanguageFilter(fileConfig.includeLanguages) ??
+			parseLanguageFilter(fileConfig.includeLanguage),
+		excludeLanguages:
+			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_EXCLUDE_LANGUAGES) ??
+			parseLanguageFilter(process.env.PI_CODEBLOCK_COPY_EXCLUDE_LANGUAGE) ??
+			parseLanguageFilter(fileConfig.excludeLanguages) ??
+			parseLanguageFilter(fileConfig.excludeLanguage) ??
+			new Set<string>(),
 		leaderShortcut: resolveShortcut(
 			DEFAULT_LEADER_SHORTCUT,
 			process.env.PI_CODEBLOCK_COPY_LEADER_SHORTCUT,
@@ -158,11 +192,17 @@ function loadConfig(): CodeblockCopyConfig {
 const CONFIG = loadConfig();
 const COMMANDS = CONFIG.commands;
 const VIEW_COMMANDS = CONFIG.viewCommands;
+const HELP_COMMANDS = CONFIG.helpCommands;
 const PRIMARY_COMMAND = COMMANDS.includes("cc") ? "cc" : COMMANDS[0] || DEFAULT_COMMANDS[0];
 const PRIMARY_VIEW_COMMAND = VIEW_COMMANDS.includes("vc") ? "vc" : VIEW_COMMANDS[0] || DEFAULT_VIEW_COMMANDS[0];
+const PRIMARY_HELP_COMMAND = HELP_COMMANDS.includes("cc-help") ? "cc-help" : HELP_COMMANDS[0] || DEFAULT_HELP_COMMANDS[0];
+const INCLUDE_LANGUAGES = CONFIG.includeLanguages;
+const EXCLUDE_LANGUAGES = CONFIG.excludeLanguages;
 const LEADER = CONFIG.leaderShortcut;
 const DIRECT_SHORTCUT = CONFIG.directShortcut;
 const LEADER_TIMEOUT_MS = CONFIG.leaderTimeoutMs;
+const COPY_STATUS_FLASH_MS = 750;
+let copyStatusFlashTimer: ReturnType<typeof setTimeout> | undefined;
 
 function isTextBlock(block: unknown): block is { type: "text"; text: string } {
 	return (
@@ -230,6 +270,10 @@ function getPreview(code: string): string {
 	return first === last ? first : `${first} ... ${last}`;
 }
 
+function shouldIncludeLanguage(language: ParsedLanguage): boolean {
+	return (!INCLUDE_LANGUAGES || INCLUDE_LANGUAGES.has(language.name)) && !EXCLUDE_LANGUAGES.has(language.name);
+}
+
 function extractCodeBlocks(markdown: string): CodeBlock[] {
 	const lines = markdown.split(/\r?\n/);
 	const blocks: CodeBlock[] = [];
@@ -255,7 +299,7 @@ function extractCodeBlocks(markdown: string): CodeBlock[] {
 		if (isClose) {
 			const code = buffer.join("\n");
 			const language = parseLanguage(info);
-			if (code.trim().length > 0 && !SKIPPED_LANGUAGES.has(language.name)) {
+			if (code.trim().length > 0 && shouldIncludeLanguage(language)) {
 				blocks.push({
 					index: blocks.length + 1,
 					language: language.name,
@@ -303,15 +347,9 @@ function widgetBlock(ctx: ExtensionContext, block: CodeBlock): string {
 }
 
 function widgetLines(ctx: ExtensionContext, blocks: CodeBlock[]): string[] {
-	const hints = [
-		LEADER ? `prefix=${LEADER}` : undefined,
-		LEADER ? "c picks" : undefined,
-		LEADER ? "v views" : undefined,
-		LEADER ? `{1-${blocks.length}} copies` : undefined,
-		DIRECT_SHORTCUT ? `${DIRECT_SHORTCUT} copies` : undefined,
-	].filter((hint): hint is string => Boolean(hint));
+	const hints = [LEADER ? `${LEADER}: c [$]` : undefined].filter((hint): hint is string => Boolean(hint));
 	const hint = hints.length > 0 ? `  ${ctx.ui.theme.fg("dim", hints.join(" · "))}` : "";
-	return [`/${PRIMARY_COMMAND} [n] · /${PRIMARY_VIEW_COMMAND} [n]${hint}`, ...blocks.map((block) => widgetBlock(ctx, block))];
+	return [`/${PRIMARY_COMMAND} [n]${hint}`, ...blocks.map((block) => widgetBlock(ctx, block))];
 }
 
 function updateWidget(ctx: ExtensionContext, text: string | undefined): void {
@@ -326,13 +364,44 @@ function updateWidget(ctx: ExtensionContext, text: string | undefined): void {
 	ctx.ui.setWidget(WIDGET_KEY, widgetLines(ctx, blocks), { placement: "aboveEditor" });
 }
 
+function notifyCopied(ctx: ExtensionContext, block: CodeBlock): void {
+	const message = `Copied [${block.index}] (${languageLabel(block.language)}, ${lineLabel(block.lineCount)})`;
+
+	if (copyStatusFlashTimer) clearTimeout(copyStatusFlashTimer);
+
+	ctx.ui.notify(ctx.ui.theme.fg("success", message), "info");
+	copyStatusFlashTimer = setTimeout(() => {
+		ctx.ui.notify(message, "info");
+		copyStatusFlashTimer = undefined;
+	}, COPY_STATUS_FLASH_MS);
+}
+
+function availableBlocksLabel(count: number): string {
+	return count === 1 ? "1" : `1-${count}`;
+}
+
+function firstArgToken(arg?: string): string | undefined {
+	return arg?.trim().split(/\s+/, 1)[0] || undefined;
+}
+
+function isValidBlockArg(arg?: string): boolean {
+	const token = firstArgToken(arg);
+	return !token || /^\d+$/.test(token);
+}
+
+function notifyInvalidBlockArg(ctx: ExtensionContext): void {
+	ctx.ui.notify(`Codeblock copy expects a block number. Use /${PRIMARY_HELP_COMMAND} for help.`, "error");
+}
+
 async function chooseBlock(ctx: ExtensionContext, blocks: CodeBlock[], arg?: string, title = "Copy code block"): Promise<CodeBlock | undefined> {
-	const requested = arg?.trim();
-	if (requested) {
-		const index = Number.parseInt(requested, 10);
+	const token = firstArgToken(arg);
+	if (token) {
+		const index = /^\d+$/.test(token) ? Number.parseInt(token, 10) : NaN;
 		if (Number.isInteger(index) && index >= 1 && index <= blocks.length) return blocks[index - 1];
 
-		ctx.ui.notify(`No code block ${requested}. Available: 1-${blocks.length}`, "error");
+		const available = availableBlocksLabel(blocks.length);
+		const usage = `/${PRIMARY_COMMAND} ${available === "1" ? "1" : "[n]"}`;
+		ctx.ui.notify(`No code block ${token}. Available: ${available}. Use ${usage} or /${PRIMARY_HELP_COMMAND}.`, "error");
 		return undefined;
 	}
 
@@ -346,32 +415,77 @@ async function chooseBlock(ctx: ExtensionContext, blocks: CodeBlock[], arg?: str
 	return blocks[index - 1];
 }
 
-async function copyCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void> {
+async function getCodeBlocks(ctx: ExtensionContext): Promise<{ text: string; blocks: CodeBlock[] } | undefined> {
 	const text = getLastAssistantText(ctx);
 	if (!text) {
 		ctx.ui.notify("No assistant response found", "error");
-		return;
+		return undefined;
 	}
 
 	const blocks = extractCodeBlocks(text);
 	if (blocks.length === 0) {
 		ctx.ui.notify("No non-markdown code blocks found in the last assistant response", "error");
 		updateWidget(ctx, undefined);
-		return;
+		return undefined;
 	}
 
 	updateWidget(ctx, text);
+	return { text, blocks };
+}
 
-	const block = await chooseBlock(ctx, blocks, arg);
+async function copyCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void> {
+	if (!isValidBlockArg(arg)) {
+		notifyInvalidBlockArg(ctx);
+		return;
+	}
+
+	const result = await getCodeBlocks(ctx);
+	if (!result) return;
+
+	const block = await chooseBlock(ctx, result.blocks, arg);
 	if (!block) return;
 
 	try {
 		await copyToClipboard(block.code);
-		ctx.ui.notify(`Copied code block ${block.index} (${languageLabel(block.language)}, ${lineLabel(block.lineCount)})`, "info");
+		notifyCopied(ctx, block);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		ctx.ui.notify(`Failed to copy code block: ${message}`, "error");
 	}
+}
+
+async function viewCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void> {
+	if (!isValidBlockArg(arg)) {
+		notifyInvalidBlockArg(ctx);
+		return;
+	}
+
+	const result = await getCodeBlocks(ctx);
+	if (!result) return;
+
+	const block = await chooseBlock(ctx, result.blocks, arg, "View code block");
+	if (!block) return;
+
+	await ctx.ui.editor(`Code block ${block.index} (${languageLabel(block.language)}, ${lineLabel(block.lineCount)})`, block.code);
+}
+
+function isHelpArg(args: string): boolean {
+	const token = args.trim().split(/\s+/, 1)[0]?.toLowerCase();
+	return token === "help" || token === "--help" || token === "-help" || token === "-h" || token === "?";
+}
+
+async function showHelp(ctx: ExtensionContext): Promise<void> {
+	const lines = [
+		`/${PRIMARY_COMMAND} [n] — copy block n, or pick if omitted`,
+		`/${PRIMARY_VIEW_COMMAND} [n] — view block n, or pick if omitted`,
+		`/${PRIMARY_HELP_COMMAND} — show this help`,
+		LEADER ? `${LEADER} then c — pick a block to copy` : undefined,
+		LEADER ? `${LEADER} then v — pick a block to view` : undefined,
+		LEADER ? `${LEADER} then 1-9 — copy that block` : undefined,
+		DIRECT_SHORTCUT ? `${DIRECT_SHORTCUT} — copy or pick` : undefined,
+	].filter((line): line is string => Boolean(line));
+
+	await ctx.ui.editor("Codeblock copy help", lines.join("\n"));
 }
 
 function isCancelKey(data: string): boolean {
@@ -392,7 +506,7 @@ export default function (pi: ExtensionAPI) {
 
 	function startLeader(ctx: ExtensionContext): void {
 		clearLeader(ctx);
-		ctx.ui.setStatus("codeblock-copy-leader", ctx.ui.theme.fg("accent", "prefix: c picker · 1-9 copy · esc cancel"));
+		ctx.ui.setStatus("codeblock-copy-leader", ctx.ui.theme.fg("accent", "prefix: c pick · 1-9 copy · esc cancel"));
 
 		leaderTimer = setTimeout(() => clearLeader(ctx), LEADER_TIMEOUT_MS);
 		leaderCleanup = ctx.ui.onTerminalInput((data) => {
@@ -401,6 +515,10 @@ export default function (pi: ExtensionAPI) {
 			if (isCancelKey(data)) return { consume: true };
 			if (data.toLowerCase() === "c") {
 				void copyCodeBlock(ctx);
+				return { consume: true };
+			}
+			if (data.toLowerCase() === "v") {
+				void viewCodeBlock(ctx);
 				return { consume: true };
 			}
 			if (/^[1-9]$/.test(data)) {
@@ -424,12 +542,40 @@ export default function (pi: ExtensionAPI) {
 	const command = {
 		description: "Copy a numbered code block from the last assistant response",
 		handler: async (args: string, ctx: ExtensionCommandContext) => {
+			if (isHelpArg(args)) {
+				await showHelp(ctx);
+				return;
+			}
 			await copyCodeBlock(ctx, args);
+		},
+	};
+
+	const viewCommand = {
+		description: "View a numbered code block from the last assistant response",
+		handler: async (args: string, ctx: ExtensionCommandContext) => {
+			if (isHelpArg(args)) {
+				await showHelp(ctx);
+				return;
+			}
+			await viewCodeBlock(ctx, args);
+		},
+	};
+	const helpCommand = {
+		description: "Show code block copy help",
+		handler: async (_args: string, ctx: ExtensionCommandContext) => {
+			await showHelp(ctx);
 		},
 	};
 
 	for (const name of COMMANDS) {
 		pi.registerCommand(name, command);
+	}
+
+	for (const name of VIEW_COMMANDS) {
+		pi.registerCommand(name, viewCommand);
+	}
+	for (const name of HELP_COMMANDS) {
+		pi.registerCommand(name, helpCommand);
 	}
 
 	if (LEADER) {
