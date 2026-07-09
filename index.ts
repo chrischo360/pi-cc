@@ -4,7 +4,7 @@ import { COMMANDS, HELP_COMMANDS, PRIMARY_COMMAND, PRIMARY_HELP_COMMAND, VIEW_CO
 import { extractCodeBlocks } from "./code-blocks.ts";
 import { getLastAssistantText, getMessageText } from "./messages.ts";
 import type { CodeBlock } from "./types.ts";
-import { languageLabel, lineLabel, notifyCopied, notifyInvalidBlockArg, showHelp, updateWidget } from "./ui.ts";
+import { languageLabel, lineLabel, notifyCopied, notifyError, notifyInvalidBlockArg, showHelp, updateWidget } from "./ui.ts";
 
 function availableBlocksLabel(count: number): string {
 	return count === 1 ? "1" : `1-${count}`;
@@ -34,7 +34,13 @@ async function chooseBlock(ctx: ExtensionContext, blocks: CodeBlock[], arg?: str
 	if (blocks.length === 1) return blocks[0];
 
 	const options = blocks.map((block) => `${block.index}. ${languageLabel(block.language)} — ${lineLabel(block.lineCount)} — ${block.preview}`);
-	const choice = await ctx.ui.select(title, options);
+	let choice: string | undefined;
+	try {
+		choice = await ctx.ui.select(title, options);
+	} catch (error) {
+		notifyError(ctx, "Failed to show code block selector", error);
+		return null;
+	}
 	if (!choice) return null;
 
 	const index = Number.parseInt(choice.split(".", 1)[0], 10);
@@ -75,8 +81,7 @@ async function copyCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void>
 		await copyToClipboard(block.code);
 		notifyCopied(ctx, block);
 	} catch (error) {
-		const message = error instanceof Error ? error.message : String(error);
-		ctx.ui.notify(`Failed to copy code block: ${message}`, "error");
+		notifyError(ctx, "Failed to copy code block", error);
 	}
 }
 
@@ -92,7 +97,11 @@ async function viewCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void>
 	const block = await chooseBlock(ctx, result.blocks, arg, "View code block");
 	if (!block) return;
 
-	await ctx.ui.editor(`Code block ${block.index} (${languageLabel(block.language)}, ${lineLabel(block.lineCount)})`, block.code);
+	try {
+		await ctx.ui.editor(`Code block ${block.index} (${languageLabel(block.language)}, ${lineLabel(block.lineCount)})`, block.code);
+	} catch (error) {
+		notifyError(ctx, "Failed to open code block", error);
+	}
 }
 
 function isHelpArg(args: string): boolean {
@@ -102,33 +111,49 @@ function isHelpArg(args: string): boolean {
 
 export default function (pi: ExtensionAPI) {
 	pi.on("session_start", async (_event, ctx) => {
-		updateWidget(ctx, getLastAssistantText(ctx));
+		try {
+			updateWidget(ctx, getLastAssistantText(ctx));
+		} catch (error) {
+			notifyError(ctx, "Failed to update code block widget", error);
+		}
 	});
 
 	pi.on("message_end", async (event, ctx) => {
 		if (event.message.role !== "assistant") return;
-		updateWidget(ctx, getMessageText(event.message));
+		try {
+			updateWidget(ctx, getMessageText(event.message));
+		} catch (error) {
+			notifyError(ctx, "Failed to update code block widget", error);
+		}
 	});
 
 	const command = {
 		description: "Copy a numbered code block from the last assistant response",
 		handler: async (args: string, ctx: ExtensionCommandContext) => {
-			if (isHelpArg(args)) {
-				await showHelp(ctx);
-				return;
+			try {
+				if (isHelpArg(args)) {
+					await showHelp(ctx);
+					return;
+				}
+				await copyCodeBlock(ctx, args);
+			} catch (error) {
+				notifyError(ctx, "Failed to run code block copy command", error);
 			}
-			await copyCodeBlock(ctx, args);
 		},
 	};
 
 	const viewCommand = {
 		description: "View a numbered code block from the last assistant response",
 		handler: async (args: string, ctx: ExtensionCommandContext) => {
-			if (isHelpArg(args)) {
-				await showHelp(ctx);
-				return;
+			try {
+				if (isHelpArg(args)) {
+					await showHelp(ctx);
+					return;
+				}
+				await viewCodeBlock(ctx, args);
+			} catch (error) {
+				notifyError(ctx, "Failed to run code block view command", error);
 			}
-			await viewCodeBlock(ctx, args);
 		},
 	};
 	const helpCommand = {
