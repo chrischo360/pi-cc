@@ -3,6 +3,7 @@ import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@e
 import { COMMANDS, HELP_COMMANDS, PRIMARY_COMMAND, PRIMARY_HELP_COMMAND, VIEW_COMMANDS } from "./Config.ts";
 import { extractCodeBlocks } from "./code-blocks.ts";
 import { getLastAssistantText, getMessageText } from "./messages.ts";
+import { firstToken, isDigits } from "./text.ts";
 import type { CodeBlock } from "./types.ts";
 import { languageLabel, lineLabel, notifyCopied, notifyInvalidBlockArg, showHelp, updateWidget } from "./ui.ts";
 
@@ -10,19 +11,15 @@ function availableBlocksLabel(count: number): string {
 	return count === 1 ? "1" : `1-${count}`;
 }
 
-function firstArgToken(arg?: string): string | null {
-	return arg?.trim().split(/\s+/, 1)[0] || null;
-}
-
 function isValidBlockArg(arg?: string): boolean {
-	const token = firstArgToken(arg);
-	return !token || /^\d+$/.test(token);
+	const token = firstToken(arg);
+	return !token || isDigits(token);
 }
 
 async function chooseBlock(ctx: ExtensionContext, blocks: CodeBlock[], arg?: string, title = "Copy code block"): Promise<CodeBlock | null> {
-	const token = firstArgToken(arg);
+	const token = firstToken(arg);
 	if (token) {
-		const index = /^\d+$/.test(token) ? Number.parseInt(token, 10) : NaN;
+		const index = isDigits(token) ? Number.parseInt(token, 10) : NaN;
 		if (Number.isInteger(index) && index >= 1 && index <= blocks.length) return blocks[index - 1];
 
 		const available = availableBlocksLabel(blocks.length);
@@ -59,16 +56,20 @@ async function getCodeBlocks(ctx: ExtensionContext): Promise<{ text: string; blo
 	return { text, blocks };
 }
 
-async function copyCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void> {
+async function resolveBlock(ctx: ExtensionContext, arg?: string, title?: string): Promise<CodeBlock | null> {
 	if (!isValidBlockArg(arg)) {
 		notifyInvalidBlockArg(ctx);
-		return;
+		return null;
 	}
 
 	const result = await getCodeBlocks(ctx);
-	if (!result) return;
+	if (!result) return null;
 
-	const block = await chooseBlock(ctx, result.blocks, arg);
+	return chooseBlock(ctx, result.blocks, arg, title);
+}
+
+async function copyCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void> {
+	const block = await resolveBlock(ctx, arg);
 	if (!block) return;
 
 	try {
@@ -81,23 +82,28 @@ async function copyCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void>
 }
 
 async function viewCodeBlock(ctx: ExtensionContext, arg?: string): Promise<void> {
-	if (!isValidBlockArg(arg)) {
-		notifyInvalidBlockArg(ctx);
-		return;
-	}
-
-	const result = await getCodeBlocks(ctx);
-	if (!result) return;
-
-	const block = await chooseBlock(ctx, result.blocks, arg, "View code block");
+	const block = await resolveBlock(ctx, arg, "View code block");
 	if (!block) return;
 
 	await ctx.ui.editor(`Code block ${block.index} (${languageLabel(block.language)}, ${lineLabel(block.lineCount)})`, block.code);
 }
 
 function isHelpArg(args: string): boolean {
-	const token = args.trim().split(/\s+/, 1)[0]?.toLowerCase();
+	const token = firstToken(args).toLowerCase();
 	return token === "help" || token === "--help" || token === "-help" || token === "-h" || token === "?";
+}
+
+function makeBlockCommand(description: string, action: (ctx: ExtensionCommandContext, args: string) => Promise<void>) {
+	return {
+		description,
+		handler: async (args: string, ctx: ExtensionCommandContext) => {
+			if (isHelpArg(args)) {
+				await showHelp(ctx);
+				return;
+			}
+			await action(ctx, args);
+		},
+	};
 }
 
 export default function (pi: ExtensionAPI) {
@@ -110,27 +116,10 @@ export default function (pi: ExtensionAPI) {
 		updateWidget(ctx, getMessageText(event.message));
 	});
 
-	const command = {
-		description: "Copy a numbered code block from the last assistant response",
-		handler: async (args: string, ctx: ExtensionCommandContext) => {
-			if (isHelpArg(args)) {
-				await showHelp(ctx);
-				return;
-			}
-			await copyCodeBlock(ctx, args);
-		},
-	};
+	const command = makeBlockCommand("Copy a numbered code block from the last assistant response", copyCodeBlock);
 
-	const viewCommand = {
-		description: "View a numbered code block from the last assistant response",
-		handler: async (args: string, ctx: ExtensionCommandContext) => {
-			if (isHelpArg(args)) {
-				await showHelp(ctx);
-				return;
-			}
-			await viewCodeBlock(ctx, args);
-		},
-	};
+	const viewCommand = makeBlockCommand("View a numbered code block from the last assistant response", viewCodeBlock);
+
 	const helpCommand = {
 		description: "Show code block copy help",
 		handler: async (_args: string, ctx: ExtensionCommandContext) => {
