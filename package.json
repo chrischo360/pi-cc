@@ -7,7 +7,10 @@
     "pi-package"
   ],
   "scripts": {
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "coverage": "vitest run --coverage"
   },
   "pi": {
     "extensions": [
@@ -19,6 +22,8 @@
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "^0.80.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "4.1.9",
+    "@vitest/coverage-v8": "4.1.9"
   }
 }
