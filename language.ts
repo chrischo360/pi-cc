@@ -1,4 +1,5 @@
 import { SUPPORTED_LANGUAGES } from "./languages.ts";
+import { firstToken } from "./text.ts";
 import type { Language, ParsedLanguage } from "./types.ts";
 
 function cleanLanguageToken(token: string): string {
@@ -10,7 +11,7 @@ function findLanguage(alias: string): Language | null {
 }
 
 export function parseLanguage(info: string): ParsedLanguage {
-	const rawLanguage = cleanLanguageToken(info.trim().split(/\s+/, 1)[0] || "") || "text";
+	const rawLanguage = cleanLanguageToken(firstToken(info)) || "text";
 	const supported = findLanguage(rawLanguage);
 	if (supported) {
 		return {
