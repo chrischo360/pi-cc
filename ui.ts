@@ -67,6 +67,14 @@ export function notifyInvalidBlockArg(ctx: ExtensionContext): void {
 	ctx.ui.notify(`Codeblock copy expects a block number. Use /${PRIMARY_HELP_COMMAND} for help.`, "error");
 }
 
+export function errorMessage(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
+export function notifyError(ctx: ExtensionContext, prefix: string, error: unknown): void {
+	ctx.ui.notify(`${prefix}: ${errorMessage(error)}`, "error");
+}
+
 export async function showHelp(ctx: ExtensionContext): Promise<void> {
 	const lines = [
 		`/${PRIMARY_COMMAND} [n] — copy block n, or pick if omitted`,
@@ -74,5 +82,9 @@ export async function showHelp(ctx: ExtensionContext): Promise<void> {
 		`/${PRIMARY_HELP_COMMAND} — show this help`,
 	];
 
-	await ctx.ui.editor("Codeblock copy help", lines.join("\n"));
+	try {
+		await ctx.ui.editor("Codeblock copy help", lines.join("\n"));
+	} catch (error) {
+		notifyError(ctx, "Failed to show help", error);
+	}
 }
